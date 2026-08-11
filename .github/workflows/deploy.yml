@@ -1,0 +1,28 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Example: trigger a Render deploy hook (add RENDER_DEPLOY_HOOK_URL as a repo secret)
+      - name: Trigger backend deploy
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          else
+            echo "No deploy hook configured yet — add RENDER_DEPLOY_HOOK_URL secret."
+          fi
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Vercel/Netlify typically auto-deploy on push once the repo is linked;
+      # this job is a placeholder for an explicit CLI-based deploy if needed.
+      - name: Note
+        run: echo "Connect this repo in Vercel/Netlify for automatic deploys."

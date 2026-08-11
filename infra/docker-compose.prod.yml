@@ -1,0 +1,39 @@
+# Reference only: for a real always-on host with Docker socket access.
+# Zero-cost deploy targets (Render/Fly.io/Neon/Upstash/Vercel) generally
+# don't run docker-compose directly — deploy backend/frontend as separate
+# services per the platform's own build config instead. Keep this file for
+# local parity testing of the "production" wiring.
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ../backend
+    environment:
+      - SANDBOX_MODE=docker
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+
+volumes:
+  pg_data:
