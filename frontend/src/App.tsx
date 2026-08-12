@@ -1,31 +1,14 @@
-import { useState } from 'react'
-import GraphView from './components/GraphView'
-import EscalationPanel from './components/EscalationPanel'
-import Timeline from './components/Timeline'
-import MemoryInspector from './components/MemoryInspector'
+import RunViewer from "./components/RunViewer";
 
+/**
+ * AgentFlow — Stage 5 frontend entry point.
+ *
+ * For this stage, App renders only the RunViewer: a live read-only
+ * view of an agent run progressing through research → draft → verify → act.
+ *
+ * Approve/reject controls, memory inspector, and multi-run comparison
+ * are deferred to later stages (they depend on backend Stages 5+).
+ */
 export default function App() {
-  const [runId, setRunId] = useState<string | null>(null)
-
-  return (
-    <div style={{ fontFamily: 'sans-serif', padding: '1.5rem' }}>
-      <h1>AgentFlow Dashboard</h1>
-      <p>Reliability control plane: checkpoints, sandbox, escalation, tracing.</p>
-
-      {!runId && (
-        <button onClick={() => setRunId('demo-run-placeholder')}>
-          Start demo run
-        </button>
-      )}
-
-      {runId && (
-        <>
-          <GraphView runId={runId} />
-          <EscalationPanel runId={runId} />
-          <Timeline runId={runId} />
-          <MemoryInspector runId={runId} />
-        </>
-      )}
-    </div>
-  )
+  return <RunViewer />;
 }
