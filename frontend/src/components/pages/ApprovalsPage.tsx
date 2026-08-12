@@ -22,6 +22,24 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({
   onReject,
 }) => {
   const [showHistory, setShowHistory] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const handleAction = async (id: string, action: "approve" | "reject") => {
+    setProcessingId(id);
+    setActionError(null);
+    try {
+      if (action === "approve") {
+        await onApprove(id);
+      } else {
+        await onReject(id);
+      }
+    } catch (err: any) {
+      setActionError(err?.message || `Failed to ${action} run ${id}`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   if (isLoading && !pending) {
     return (
@@ -50,6 +68,13 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({
         }
       />
 
+      {actionError && (
+        <div className="mb-4 p-3 bg-danger/20 border border-danger/40 rounded text-xs text-white font-mono flex items-center justify-between">
+          <span>⚠️ {actionError}</span>
+          <button className="btn btn-sm btn-ghost text-xs" onClick={() => setActionError(null)}>Dismiss</button>
+        </div>
+      )}
+
       {/* Pending Review List */}
       {!hasPending ? (
         <EmptyState
@@ -59,60 +84,65 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({
         />
       ) : (
         <div className="flex flex-col gap-4 mb-8">
-          {pending.map((item) => (
-            <div key={item.id} className="panel approval-card border-l-4 border-l-warning">
-              <div className="panel-body flex items-start justify-between gap-6">
-                <div className="approval-info flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h4 className="font-semibold text-base">{item.title}</h4>
-                    <RiskDot score={item.riskScore} />
-                  </div>
+          {pending.map((item) => {
+            const isProcessing = processingId === item.id;
+            return (
+              <div key={item.id} className="panel approval-card border-l-4 border-l-warning">
+                <div className="panel-body flex items-start justify-between gap-6">
+                  <div className="approval-info flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-semibold text-base">{item.title}</h4>
+                      <RiskDot score={item.riskScore} />
+                    </div>
 
-                  <div className="flex flex-col gap-1 text-xs font-mono text-muted mb-3 bg-black/40 p-3 rounded border border-border">
-                    <div><span className="text-white font-semibold">Tool:</span> {item.toolName}</div>
-                    <div><span className="text-white font-semibold">Workflow:</span> {item.workflowId.slice(0, 8)}...</div>
-                    <div><span className="text-white font-semibold">Subject:</span> {item.subjectId}</div>
-                    {item.impactValue && (
-                      <div className="text-warning font-semibold">
-                        <span>Impact:</span> {item.impactValue}
+                    <div className="flex flex-col gap-1.5 text-xs font-mono text-muted mb-3 bg-black/40 p-3 rounded border border-border">
+                      <div className="flex items-center gap-2"><span className="text-white font-semibold w-24">Tool:</span> <span>{item.toolName}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-white font-semibold w-24">Workflow:</span> <span className="text-primary">{item.workflowId}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-white font-semibold w-24">Subject:</span> <span>{item.subjectId}</span></div>
+                      {item.impactValue && (
+                        <div className="flex items-center gap-2 text-warning font-semibold">
+                          <span className="w-24">Impact:</span> <span>{item.impactValue}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {item.reasons && item.reasons.length > 0 && (
+                      <div className="reasons-box bg-near-black p-2.5 rounded border border-border text-xs text-muted mb-2">
+                        <div className="font-mono font-semibold text-warning mb-1 flex items-center gap-1">
+                          <AlertTriangle size={12} /> Escalation Reasons:
+                        </div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {item.reasons.map((r, idx) => (
+                            <li key={idx}>{r}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
 
-                  {item.reasons && item.reasons.length > 0 && (
-                    <div className="reasons-box bg-near-black p-2 rounded border border-border text-xs text-muted mb-2">
-                      <div className="font-mono font-semibold text-warning mb-1 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Escalation Reasons:
-                      </div>
-                      <ul className="list-disc list-inside space-y-1">
-                        {item.reasons.map((r, idx) => (
-                          <li key={idx}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                  <div className="approval-actions flex items-center gap-2">
+                    <button
+                      className="btn btn-success"
+                      onClick={() => handleAction(item.id, "approve")}
+                      disabled={isProcessing}
+                    >
+                      <Check size={14} />
+                      <span>{isProcessing ? "Processing..." : "Approve"}</span>
+                    </button>
 
-                <div className="approval-actions flex items-center gap-2">
-                  <button
-                    className="btn btn-success"
-                    onClick={() => onApprove(item.id)}
-                  >
-                    <Check size={14} />
-                    <span>Approve</span>
-                  </button>
-
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => onReject(item.id)}
-                  >
-                    <X size={14} />
-                    <span>Reject</span>
-                  </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => handleAction(item.id, "reject")}
+                      disabled={isProcessing}
+                    >
+                      <X size={14} />
+                      <span>{isProcessing ? "Processing..." : "Reject"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
