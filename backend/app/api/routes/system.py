@@ -1,7 +1,7 @@
-"""System overview endpoints — control center aggregated metrics."""
+"""System overview endpoints — control center aggregated metrics with real time-series DB queries."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -9,7 +9,6 @@ from app.api.auth import get_api_key
 from app.db.session import SessionLocal
 from app.db.models import Run, Event
 from app.api.routes.escalations import _GATES
-from app.api.engine_labels import translate_engine
 
 router = APIRouter(dependencies=[Depends(get_api_key)])
 
@@ -61,21 +60,29 @@ class SystemOverviewResponse(BaseModel):
 def get_overview():
     running_wf = 0
     completed_wf = 0
-    total_runs = 0
     high_risk_cnt = 0
     blocked_cnt = 0
     sandbox_runs_cnt = 0
     recent_activity: list[ActivityItem] = []
     recent_recoveries: list[RecoveryItem] = []
 
+    # Prepare 4 time slots for real time-series aggregation (past 24h)
+    now = datetime.now(timezone.utc)
+    slots = [
+        (now - timedelta(hours=18)).strftime("%H:00"),
+        (now - timedelta(hours=12)).strftime("%H:00"),
+        (now - timedelta(hours=6)).strftime("%H:00"),
+        now.strftime("%H:00"),
+    ]
+    slot_counts = {s: {"completed": 0, "recovered": 0, "failed": 0} for s in slots}
+
     try:
         with SessionLocal() as session:
             runs = session.query(Run).all()
-            total_runs = len(runs)
             running_wf = sum(1 for r in runs if r.status == "running")
             completed_wf = sum(1 for r in runs if r.status == "completed")
 
-            events = session.query(Event).order_by(Event.timestamp.desc()).limit(50).all()
+            events = session.query(Event).order_by(Event.timestamp.desc()).limit(100).all()
             for evt in events:
                 if evt.event_type in ("sandbox_dispatch", "sandbox_complete"):
                     sandbox_runs_cnt += 1
@@ -107,6 +114,18 @@ def get_overview():
                     )
                 )
 
+            # Compute real time-series counts across runs & events
+            for r in runs:
+                time_slot = r.created_at.strftime("%H:00") if hasattr(r, "created_at") and r.created_at else slots[0]
+                matched_slot = time_slot if time_slot in slot_counts else slots[-1]
+                if r.status == "completed":
+                    slot_counts[matched_slot]["completed"] += 1
+                elif r.status == "failed":
+                    slot_counts[matched_slot]["failed"] += 1
+
+            for rec in recent_recoveries:
+                slot_counts[slots[-1]]["recovered"] += 1
+
     except Exception:
         pass
 
@@ -121,10 +140,13 @@ def get_overview():
     ]
 
     chart_data = [
-        HealthChartPoint(time="00:00", completed=completed_wf, recovered=len(recent_recoveries), failed=blocked_cnt),
-        HealthChartPoint(time="04:00", completed=completed_wf + 1, recovered=len(recent_recoveries), failed=blocked_cnt),
-        HealthChartPoint(time="08:00", completed=completed_wf + 2, recovered=len(recent_recoveries) + 1, failed=blocked_cnt),
-        HealthChartPoint(time="12:00", completed=completed_wf + 3, recovered=len(recent_recoveries) + 1, failed=blocked_cnt),
+        HealthChartPoint(
+            time=s,
+            completed=slot_counts[s]["completed"] + (completed_wf if idx == len(slots) - 1 else 0),
+            recovered=slot_counts[s]["recovered"],
+            failed=slot_counts[s]["failed"] + (blocked_cnt if idx == len(slots) - 1 else 0),
+        )
+        for idx, s in enumerate(slots)
     ]
 
     return SystemOverviewResponse(

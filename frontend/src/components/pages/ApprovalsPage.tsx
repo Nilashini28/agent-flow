@@ -68,14 +68,14 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({
                     <RiskDot score={item.riskScore} />
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs font-mono text-muted mb-3">
-                    <span>Tool: {item.toolName}</span>
-                    <span>Workflow: {item.workflowId.slice(0, 8)}</span>
-                    <span>Subject: {item.subjectId}</span>
+                  <div className="flex flex-col gap-1 text-xs font-mono text-muted mb-3 bg-black/40 p-3 rounded border border-border">
+                    <div><span className="text-white font-semibold">Tool:</span> {item.toolName}</div>
+                    <div><span className="text-white font-semibold">Workflow:</span> {item.workflowId.slice(0, 8)}...</div>
+                    <div><span className="text-white font-semibold">Subject:</span> {item.subjectId}</div>
                     {item.impactValue && (
-                      <span className="text-warning font-semibold">
-                        Impact: {item.impactValue}
-                      </span>
+                      <div className="text-warning font-semibold">
+                        <span>Impact:</span> {item.impactValue}
+                      </div>
                     )}
                   </div>
 

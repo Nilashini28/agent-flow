@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Play } from "./Icons";
+import { EngineItem } from "../../types";
+import { api } from "../../api/client";
 
 interface LaunchWorkflowModalProps {
   isOpen: boolean;
@@ -14,6 +16,23 @@ export const LaunchWorkflowModal: React.FC<LaunchWorkflowModalProps> = ({
 }) => {
   const [task, setTask] = useState("");
   const [framework, setFramework] = useState<"langgraph" | "autogen">("langgraph");
+  const [engines, setEngines] = useState<EngineItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      api.getEngines().then((res) => {
+        if (res && res.length > 0) {
+          setEngines(res);
+        }
+      }).catch(() => {
+        // Fallback default neutral engines
+        setEngines([
+          { id: "langgraph", label: "Execution Engine A", description: "", executionPattern: "", inheritsGovernance: true },
+          { id: "autogen", label: "Execution Engine B", description: "", executionPattern: "", inheritsGovernance: true },
+        ]);
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -56,8 +75,11 @@ export const LaunchWorkflowModal: React.FC<LaunchWorkflowModalProps> = ({
               value={framework}
               onChange={(e) => setFramework(e.target.value as any)}
             >
-              <option value="langgraph">Execution Engine A</option>
-              <option value="autogen">Execution Engine B</option>
+              {engines.map((eng) => (
+                <option key={eng.id} value={eng.id}>
+                  {eng.label}
+                </option>
+              ))}
             </select>
           </div>
 

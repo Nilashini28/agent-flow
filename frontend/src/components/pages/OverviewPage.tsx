@@ -16,15 +16,6 @@ import {
   Box,
   ArrowRight,
 } from "../common/Icons";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 
 interface OverviewPageProps {
   data: OverviewData | null;
@@ -115,60 +106,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         />
       </div>
 
-      <div className="grid-2 gap-6 mt-6">
-        {/* Workflow Health Chart */}
-        <div className="panel">
-          <div className="panel-header">
-            <h3 className="panel-title">Workflow Execution Health</h3>
-            <span className="text-xs text-muted font-mono">Time-series</span>
-          </div>
-          <div className="panel-body chart-container" style={{ height: 260 }}>
-            {hasData && data.chartData && data.chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.chartData}>
-                  <defs>
-                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorRecovered" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                  <XAxis dataKey="time" stroke="#737373" fontSize={12} />
-                  <YAxis stroke="#737373" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#171717",
-                      borderColor: "#262626",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="completed"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorCompleted)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="recovered"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#colorRecovered)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState title="No Chart Data" description="No metrics recorded yet." />
-            )}
-          </div>
-        </div>
-
+      <div className="grid-1 gap-6 mt-6">
         {/* System Subsystems Health Panel */}
         <div className="panel">
           <div className="panel-header">

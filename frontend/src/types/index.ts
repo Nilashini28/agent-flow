@@ -53,6 +53,14 @@ export interface HealthChartPoint {
   failed: number;
 }
 
+export interface EngineItem {
+  id: string;
+  label: string;
+  description: string;
+  executionPattern: string;
+  inheritsGovernance: boolean;
+}
+
 export interface OverviewData {
   activeAgents: number;
   runningWorkflows: number;

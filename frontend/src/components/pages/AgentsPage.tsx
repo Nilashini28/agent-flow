@@ -1,10 +1,11 @@
-import React from "react";
-import { AgentItem } from "../../types";
+import React, { useEffect, useState } from "react";
+import { AgentItem, EngineItem } from "../../types";
 import { PageHeader } from "../common/PageHeader";
 import { StatusPill } from "../common/StatusPill";
 import { LoadingSkeleton } from "../common/LoadingSkeleton";
 import { EmptyState } from "../common/EmptyState";
-import { Users, Shield, Cpu, Wrench } from "../common/Icons";
+import { Users, Shield, Cpu, Wrench, Info, CheckCircle } from "../common/Icons";
+import { api } from "../../api/client";
 
 interface AgentsPageProps {
   agents: AgentItem[] | null;
@@ -12,12 +13,18 @@ interface AgentsPageProps {
 }
 
 export const AgentsPage: React.FC<AgentsPageProps> = ({ agents, isLoading }) => {
+  const [engines, setEngines] = useState<EngineItem[] | null>(null);
+
+  useEffect(() => {
+    api.getEngines().then(setEngines).catch(() => setEngines([]));
+  }, []);
+
   if (isLoading) {
     return (
       <div className="page-container">
         <PageHeader
-          title="Agents Registry"
-          description="Autonomous AI agents governed by AgentFlow control plane."
+          title="Agents Registry & Integration"
+          description="Autonomous AI agents and execution engines governed by AgentFlow control plane."
         />
         <LoadingSkeleton height="180px" count={3} className="mb-4" />
       </div>
@@ -29,8 +36,8 @@ export const AgentsPage: React.FC<AgentsPageProps> = ({ agents, isLoading }) => 
   return (
     <div className="page-container">
       <PageHeader
-        title="Agents Registry"
-        description="Autonomous AI agents governed by AgentFlow control plane."
+        title="Agents Registry & Integration"
+        description="Autonomous AI agents and execution engines governed by AgentFlow control plane."
         meta={
           <span className="font-mono text-xs text-muted">
             {hasAgents ? `${agents.length} Agents Registered` : "0 Agents"}
@@ -38,6 +45,52 @@ export const AgentsPage: React.FC<AgentsPageProps> = ({ agents, isLoading }) => 
         }
       />
 
+      {/* Info Panel: How to plug in a new agent */}
+      <div className="panel p-4 mb-6 border-l-4 border-l-primary bg-near-black">
+        <div className="flex items-start gap-3">
+          <Info size={20} className="text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <h4 className="font-semibold text-white mb-1">
+              Plugging in an Autonomous Agent Engine
+            </h4>
+            <p className="text-muted text-xs leading-relaxed">
+              AgentFlow works with any agent framework that implements our step-based execution contract.
+              Adding a new engine requires no changes to checkpointing, sandboxing, or risk scoring.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Registered Execution Engines Cards */}
+      {engines && engines.length > 0 && (
+        <div className="mb-8">
+          <h3 className="panel-title mb-3 text-sm text-muted font-mono uppercase tracking-wider">
+            Registered Execution Engine Adapters
+          </h3>
+          <div className="grid-2 gap-6">
+            {engines.map((eng) => (
+              <div key={eng.id} className="panel p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-base text-white">{eng.label}</h4>
+                  <span className="badge badge-success text-xs font-mono flex items-center gap-1">
+                    <CheckCircle size={12} /> Inherits Governance
+                  </span>
+                </div>
+                <p className="text-xs text-muted mb-3">{eng.description}</p>
+                <div className="text-xs font-mono text-primary bg-black/40 p-2.5 rounded border border-border">
+                  <span className="text-muted block text-[10px] uppercase">Execution Pattern:</span>
+                  {eng.executionPattern}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Agents Cards */}
+      <h3 className="panel-title mb-3 text-sm text-muted font-mono uppercase tracking-wider">
+        Active Governed Agents
+      </h3>
       {!hasAgents ? (
         <EmptyState
           title="No Registered Agents"

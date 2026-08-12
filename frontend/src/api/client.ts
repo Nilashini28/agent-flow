@@ -10,6 +10,7 @@ import {
   ApprovalItem,
   AuditEvent,
   EvaluationData,
+  EngineItem,
 } from "../types";
 
 const API_BASE = "http://localhost:8000";
@@ -78,9 +79,12 @@ export const api = {
     return fetchJson<OverviewData>("/system/overview");
   },
 
-  // Page 2: Agents
+  // Page 2: Agents & Engines
   getAgents: async (): Promise<AgentItem[]> => {
     return fetchJson<AgentItem[]>("/agents");
+  },
+  getEngines: async (): Promise<EngineItem[]> => {
+    return fetchJson<EngineItem[]>("/engines");
   },
 
   // Page 3: Workflows
