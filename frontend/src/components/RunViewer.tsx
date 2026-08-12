@@ -558,12 +558,12 @@ export default function RunViewer() {
                 textTransform: "uppercase" as const,
               }}
             >
-              {fw === "langgraph" ? "⛓ LangGraph" : "🤖 AutoGen"}
+              {fw === "langgraph" ? "Execution Engine A" : "Execution Engine B"}
             </button>
           ))}
           {framework === "autogen" && !runId && (
             <span style={{ fontSize: "0.72rem", color: "#7c3aed", alignSelf: "center", marginLeft: "0.25rem" }}>
-              PlannerAgent + CriticAgent · 3-turn conversation
+              Multi-Agent Conversation · 3-turn sequence
             </span>
           )}
         </div>
@@ -571,7 +571,7 @@ export default function RunViewer() {
           <input
             style={S.input}
             type="text"
-            placeholder={framework === "autogen" ? "Enter a task for PlannerAgent…" : "Enter a task for the agent…"}
+            placeholder="Enter a task for the agent…"
             value={task}
             onChange={(e) => setTask(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -593,7 +593,7 @@ export default function RunViewer() {
               disabled={starting || !task.trim()}
               aria-label="Start run"
             >
-              {starting ? "Starting…" : `▶ Start ${framework === "autogen" ? "AutoGen" : ""} run`}
+              {starting ? "Starting…" : "▶ Start run"}
             </button>
           ) : (
             <button

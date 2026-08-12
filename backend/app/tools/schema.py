@@ -40,8 +40,9 @@ class FileWriteInput(BaseModel):
 
 class StubRetrievalInput(BaseModel):
     """Input for the stub-retrieval memory tool."""
-    model_config = {"extra": "forbid"}
-    query: str = Field(..., min_length=1, max_length=512, description="Memory retrieval query")
+    model_config = {"extra": "allow"}
+    query: str = Field(default="", max_length=512, description="Memory retrieval query")
+    command: str = Field(default="", max_length=512, description="Memory retrieval command")
 
 
 class StubExecutorInput(BaseModel):

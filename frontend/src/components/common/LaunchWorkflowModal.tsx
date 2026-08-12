@@ -56,8 +56,8 @@ export const LaunchWorkflowModal: React.FC<LaunchWorkflowModalProps> = ({
               value={framework}
               onChange={(e) => setFramework(e.target.value as any)}
             >
-              <option value="langgraph">Graph Execution Engine A (LangGraph)</option>
-              <option value="autogen">Multi-Agent Conversation Engine B (AutoGen)</option>
+              <option value="langgraph">Execution Engine A</option>
+              <option value="autogen">Execution Engine B</option>
             </select>
           </div>
 
