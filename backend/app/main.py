@@ -9,7 +9,10 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import get_settings
-from app.api.routes import runs, checkpoints, escalations, traces, tools
+from app.api.routes import (
+    runs, checkpoints, escalations, traces, tools,
+    system, agents, sandbox, risk, evaluation
+)
 from app.api.error_handlers import (
     validation_exception_handler,
     http_exception_handler,
@@ -53,11 +56,16 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-app.include_router(runs.router,         prefix="/runs",   tags=["runs"])
-app.include_router(checkpoints.router,  prefix="/runs",   tags=["checkpoints"])
-app.include_router(escalations.router,  prefix="/runs",   tags=["escalations"])
-app.include_router(traces.router,       prefix="/runs",   tags=["traces"])
-app.include_router(tools.router,        prefix="/tools",  tags=["tools"])
+app.include_router(runs.router,         prefix="/runs",        tags=["runs"])
+app.include_router(checkpoints.router,  prefix="/runs",        tags=["checkpoints"])
+app.include_router(escalations.router,  prefix="/runs",        tags=["escalations"])
+app.include_router(traces.router,       prefix="/runs",        tags=["traces"])
+app.include_router(tools.router,        prefix="/tools",       tags=["tools"])
+app.include_router(system.router,       prefix="/system",      tags=["system"])
+app.include_router(agents.router,       prefix="/agents",      tags=["agents"])
+app.include_router(sandbox.router,      prefix="/sandbox",     tags=["sandbox"])
+app.include_router(risk.router,         prefix="/risk",        tags=["risk"])
+app.include_router(evaluation.router,   prefix="/evaluation",  tags=["evaluation"])
 
 
 @app.get("/health")
