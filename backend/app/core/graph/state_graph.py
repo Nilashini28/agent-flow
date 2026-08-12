@@ -5,13 +5,15 @@ transition, so a crash mid-run can resume from the last completed node
 instead of restarting the whole task.
 
 Routing summary (after verify_step):
-  risk <= escalation_continue_max  -> "act"           (safe to proceed)
-  risk <= escalation_approve_max   -> END (awaiting)  (human approval needed)
-  risk >  escalation_approve_max   -> END (halted)    (too risky; stop here)
+  risk <= escalation_continue_max  -> "act"            (safe to proceed)
+  risk <= escalation_approve_max   -> blocks on gate   (human approval needed)
+  risk >  escalation_approve_max   -> END (halted)     (too risky; stop here)
 
-# STAGE-2: checkpoint recovery (resume after halt/crash) wires in here.
-# STAGE-5: escalation hooks (Slack / human-in-the-loop) attach to
-#           route_after_verify's REQUEST_APPROVAL branch.
+Stage-5 approval gate:
+  REQUEST_APPROVAL registers a threading.Event in escalations._GATES,
+  logs status=awaiting_approval, then blocks the graph thread until the
+  frontend calls POST /approve or /reject. On approve the run continues
+  to act_step; on reject it ends with status=halted.
 """
 from langgraph.graph import END, StateGraph
 
@@ -41,15 +43,43 @@ def route_after_verify(state: AgentState) -> str:
         return END  # type: ignore[return-value]
 
     if decision == "REQUEST_APPROVAL":
-        # Risk is between continue_max and approve_max: pause and surface to a
-        # human operator.  The run stays in the checkpoint store; Stage-2 will
-        # allow resumption once approval is granted.
+        # ── Stage-5 approval gate ────────────────────────────────────────────
+        # Register a threading.Event gate, log awaiting_approval into the
+        # timeline (the frontend polls this and shows the amber banner), then
+        # block this thread until Approve or Reject arrives via HTTP.
+        from app.api.routes.escalations import (
+            clear_gate,
+            get_decision,
+            register_approval_gate,
+        )
+
+        gate = register_approval_gate(run_id)
+        log_event(
+            run_id,
+            "awaiting_approval",
+            {"risk_score": risk, "decision": "REQUEST_APPROVAL", "status": "awaiting_approval"},
+        )
         log_event(
             run_id,
             "routing_decision",
             {"decision": "REQUEST_APPROVAL", "risk_score": risk},
         )
-        return END  # type: ignore[return-value]
+
+        # Block until the frontend calls /approve or /reject (no timeout —
+        # this is intentional: the run waits indefinitely for human input).
+        gate.wait()
+        human_decision = get_decision(run_id)
+        clear_gate(run_id)
+
+        if human_decision == "approved":
+            log_event(run_id, "escalation_approved", {"risk_score": risk})
+            # Mutate state so act_step sees updated status.
+            state["status"] = "running"  # type: ignore[index]
+            return "act"
+        else:
+            log_event(run_id, "escalation_rejected", {"risk_score": risk})
+            state["status"] = "halted"   # type: ignore[index]
+            return END  # type: ignore[return-value]
 
     # decision == "CONTINUE": risk is within the safe threshold — proceed to
     # act_step and let the agent execute the verified plan.

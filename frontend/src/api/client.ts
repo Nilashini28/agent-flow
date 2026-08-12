@@ -1,5 +1,5 @@
 /**
- * AgentFlow API client — Stage 5 frontend (read-only).
+ * AgentFlow API client — Stage 5 (read-only polling + escalation approval).
  *
  * All requests go through Vite's /api proxy to http://localhost:8000 in dev,
  * and through a Vercel rewrite rule in production.
@@ -64,17 +64,18 @@ async function apiFetch(path: string, init?: RequestInit): Promise<unknown> {
 export interface RunCreated {
   run_id: string;
   status: string;
+  framework?: string;
 }
 
 /**
  * POST /runs — start a new agent run with the given task string.
- * Returns { run_id, status } from the backend.
+ * Returns { run_id, status, framework } from the backend.
  */
-export async function createRun(task: string): Promise<RunCreated> {
+export async function createRun(task: string, framework: "langgraph" | "autogen" = "langgraph"): Promise<RunCreated> {
   return apiFetch("/runs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ task }),
+    body: JSON.stringify({ task, framework }),
   }) as Promise<RunCreated>;
 }
 
@@ -108,3 +109,31 @@ export async function getTimeline(runId: string): Promise<TimelineEvent[]> {
   const data = await apiFetch(`/runs/${runId}/timeline`);
   return ((data as { events?: TimelineEvent[] }).events ?? []);
 }
+
+// ── Stage 5: Escalation approval ──────────────────────────────────────────────
+
+export interface EscalationDecision {
+  run_id: string;
+  status: "approved" | "rejected";
+}
+
+/**
+ * POST /runs/{id}/escalations/approve
+ * Unblocks the graph thread — the run continues to act_step.
+ */
+export async function approveRun(runId: string): Promise<EscalationDecision> {
+  return apiFetch(`/runs/${runId}/escalations/approve`, {
+    method: "POST",
+  }) as Promise<EscalationDecision>;
+}
+
+/**
+ * POST /runs/{id}/escalations/reject
+ * Unblocks the graph thread — the run ends with status=halted.
+ */
+export async function rejectRun(runId: string): Promise<EscalationDecision> {
+  return apiFetch(`/runs/${runId}/escalations/reject`, {
+    method: "POST",
+  }) as Promise<EscalationDecision>;
+}
+
