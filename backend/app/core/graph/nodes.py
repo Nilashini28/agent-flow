@@ -40,6 +40,7 @@ so no stale count is carried over).
 from __future__ import annotations
 
 import re
+import sys
 import textwrap
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -398,24 +399,58 @@ def verify_step(state: AgentState) -> AgentState:
 
 
 def act_step(state: AgentState) -> AgentState:
-    """Execute the verified plan and mark the run as completed.
+    """Execute the verified plan via the sandbox and mark the run as completed.
+
+    Stage-4 wiring: each plan step is dispatched through run_sandboxed()
+    using the stub-executor ToolPolicy.  The sandbox enforces:
+      - Wall-clock timeout (always).
+      - Memory and CPU limits (POSIX only; timeout-only on Windows).
+      - Filesystem write path validation (stub-executor → sandbox_output/ only).
+
+    TimeoutError from the sandbox is RETRYABLE per Stage 3's policy
+    (TimeoutError is in RETRYABLE_EXCEPTIONS).  _run_with_retry handles this
+    automatically — act_step's _body just lets the exception propagate.
 
     Uses ACT_POLICY (max_retries=1) to limit duplicate side-effect risk.
-    STAGE-4: real sandbox tool calls land here.
+    STAGE-6: real LLM/tool commands replace the stub-executor command below.
     """
     run_id = state["run_id"]
     log_event(run_id, "node_start", {"node": "act", "step": state.get("step_index", 0)})
 
     def _body(s: AgentState) -> dict[str, Any]:
+        from app.core.sandbox.docker_runner import run_sandboxed
+        from app.core.sandbox.policy import get_policy_or_deny
+        from app.core.sandbox.violations import check_write_path_policy
+
         draft_output = s.get("last_output", "")
 
+        # Parse plan steps from draft output.
         executed_steps: list[str] = []
         if "Step" in draft_output:
             raw_steps = [st.strip() for st in draft_output.split("|") if "Step" in st]
-            for raw in raw_steps:
-                executed_steps.append(f"EXECUTED: {raw}")
         else:
-            executed_steps.append(f"EXECUTED: primary goal from '{draft_output[:60]}'")
+            raw_steps = [f"primary goal from '{draft_output[:60]}'"]
+
+        # Fetch the sandbox policy for stub-executor.
+        executor_policy = get_policy_or_deny("stub-executor")
+
+        for raw in raw_steps:
+            # Build a sandboxed command: echo the step name as the tool's action.
+            # STAGE-6: replace with real tool dispatcher commands.
+            command = [sys.executable, "-c", f"print('EXECUTED: {raw}')"]
+
+            log_event(
+                run_id,
+                "sandbox_dispatch",
+                {
+                    "tool": "stub-executor",
+                    "step": raw[:80],
+                    "sandbox_mode": _get_effective_mode(),
+                },
+            )
+
+            sandbox_output = run_sandboxed(executor_policy, command, run_id=run_id)
+            executed_steps.append(sandbox_output.strip() or f"EXECUTED: {raw}")
 
         action_log = " | ".join(executed_steps)
         output = f"ACT | steps_executed={len(executed_steps)} | {action_log}"
@@ -455,3 +490,14 @@ def act_step(state: AgentState) -> AgentState:
         }
 
     return _run_with_retry(_body, "act", state)
+
+
+def _get_effective_mode() -> str:
+    """Return the actual sandbox mode being used (accounts for Docker fallback)."""
+    from app.core.sandbox.docker_runner import _DOCKER_UNAVAILABLE
+    from app.config import get_settings
+    settings = get_settings()
+    if settings.sandbox_mode == "docker" and _DOCKER_UNAVAILABLE:
+        return "subprocess (docker-fallback)"
+    return settings.sandbox_mode
+
