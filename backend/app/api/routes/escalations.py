@@ -11,9 +11,11 @@ after a human decision, so all transitions are still checkpointed.
 """
 import threading
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()
+from app.api.auth import get_api_key
+
+router = APIRouter(dependencies=[Depends(get_api_key)])
 
 # run_id → {"event": threading.Event, "decision": "approved"|"rejected"|None}
 _GATES: dict[str, dict] = {}

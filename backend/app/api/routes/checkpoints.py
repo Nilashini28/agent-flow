@@ -1,9 +1,10 @@
 """Inspect checkpoints for a run."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.auth import get_api_key
 from app.core.checkpointing.recovery import get_latest_checkpoint
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_api_key)])
 
 
 @router.get("/{run_id}/checkpoints")

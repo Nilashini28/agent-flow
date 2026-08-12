@@ -1,18 +1,15 @@
 """AgentFlow reliability runner for framework adapters.
 
-This is the piece that applies all four AgentFlow reliability guarantees to
-ANY FrameworkAdapter implementation in an identical, framework-agnostic way.
-
 Guarantee application order (per step):
   1. log_event(node_start)          [observability / Stage 8]
   2. adapter.run_step()             [framework-specific work]
-  3. sandbox each tool_call         [Stage 4, same run_sandboxed() call]
-  4. score + escalation routing     [Stage 5, same score_step() + decide()]
-  5. checkpoint_store.save()        [Stage 2 co-located store]
-  6. log_event(node_complete)       [observability / Stage 8]
+  3. schema validation per tool     [Stage 9 — before sandbox]
+  4. sandbox each tool_call         [Stage 4, same run_sandboxed() call]
+  5. score + escalation routing     [Stage 5, same score_step() + decide()]
+  6. checkpoint_store.save()        [Stage 2 co-located store]
+  7. log_event(node_complete)       [observability / Stage 8]
 
-This function is called identically for the LangGraph adapter and the AutoGen
-adapter. Zero framework-specific branches exist here.
+Zero framework-specific branches in this file.
 """
 from __future__ import annotations
 
@@ -81,10 +78,35 @@ def run_adapter(
             store.save(run_id, step_id, state)
             break
 
-        # ── 3. Sandbox each tool call (Stage 4) ───────────────────────────
+        # ── 3. Schema validation + sandbox per tool call (Stages 4+9) ────────
         sandboxed_calls: list[dict[str, Any]] = []
         for tc in result.tool_calls:
             tool_name = tc.get("tool", "stub-executor")
+            raw_input = tc.get("input", "")
+
+            # Schema validation BEFORE sandbox dispatch.
+            # If validation fails, log tool_validation_failed and re-raise.
+            # No sandbox_dispatch event fires for invalid inputs.
+            try:
+                from app.tools.registry import validate_and_get_tool
+                validate_and_get_tool(tool_name, raw_input)
+            except KeyError:
+                # Tool not in registry — will be caught as PermissionError in sandbox.
+                pass
+            except Exception as val_exc:  # pydantic.ValidationError or similar
+                log_event(
+                    run_id,
+                    "tool_validation_failed",
+                    {
+                        "node": step_id,
+                        "tool": tool_name,
+                        "error": str(val_exc)[:300],
+                    },
+                )
+                raise PermissionError(
+                    f"Tool {tool_name!r} input failed schema validation: {val_exc}"
+                ) from val_exc
+
             sandboxed_output = _sandbox_tool_call(run_id, tool_name, tc, step_id)
             sandboxed_calls.append({**tc, "sandboxed_output": sandboxed_output})
 

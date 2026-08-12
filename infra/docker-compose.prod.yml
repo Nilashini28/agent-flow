@@ -1,39 +1,57 @@
-# Reference only: for a real always-on host with Docker socket access.
-# Zero-cost deploy targets (Render/Fly.io/Neon/Upstash/Vercel) generally
-# don't run docker-compose directly — deploy backend/frontend as separate
-# services per the platform's own build config instead. Keep this file for
-# local parity testing of the "production" wiring.
 version: "3.9"
 
 services:
-  api:
-    build:
-      context: ../backend
-    environment:
-      - SANDBOX_MODE=docker
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-      - redis
-    restart: unless-stopped
-
   postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: agentflow
+      POSTGRES_USER: agentflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  frontend:
+  backend:
     build:
-      context: ../frontend
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+psycopg://agentflow:${POSTGRES_PASSWORD:-changeme}@postgres:5432/agentflow
+      REDIS_URL: redis://redis:6379/0
+      API_KEY: ${API_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://your-frontend.vercel.app}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
+      ESCALATION_CONTINUE_MAX: ${ESCALATION_CONTINUE_MAX:-0.35}
+      ESCALATION_APPROVE_MAX: ${ESCALATION_APPROVE_MAX:-0.70}
     ports:
-      - "5173:5173"
-    restart: unless-stopped
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
-  pg_data:
+  postgres_data:
